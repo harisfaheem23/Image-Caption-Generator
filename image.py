@@ -9,33 +9,24 @@ import os
 # Define the working directory for loading files
 WORKING_DIR = '.'  # Current directory
 
-# Load the trained model
-model_path = os.path.join(WORKING_DIR, 'best_model.keras')
-tokenizer_path = os.path.join(WORKING_DIR, 'tokenizer.pickle')
-max_length_path = os.path.join(WORKING_DIR, 'max_length.pkl')
+# Disable GPU if causing issues
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-# Load model, tokenizer, and max_length with error handling
-try:
-    model = tf.keras.models.load_model(model_path)
-except Exception as e:
-    st.error(f"Error loading model: {e}")
+# Cache model and tokenizer loading for efficiency
+@st.cache(allow_output_mutation=True)
+def load_model_and_tokenizer():
+    model = tf.keras.models.load_model(os.path.join(WORKING_DIR, 'best_model.keras'))
+    with open(os.path.join(WORKING_DIR, 'tokenizer.pickle'), 'rb') as f:
+        tokenizer = pickle.load(f)
+    with open(os.path.join(WORKING_DIR, 'max_length.pkl'), 'rb') as f:
+        max_length = pickle.load(f)
+    return model, tokenizer, max_length
+
+model, tokenizer, max_length = load_model_and_tokenizer()
 
 # Load VGG16 model for feature extraction
 vgg_model = VGG16()
 vgg_model = tf.keras.Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
-
-# Load tokenizer and max_length
-try:
-    with open(tokenizer_path, 'rb') as f:
-        tokenizer = pickle.load(f)
-except Exception as e:
-    st.error(f"Error loading tokenizer: {e}")
-
-try:
-    with open(max_length_path, 'rb') as f:
-        max_length = pickle.load(f)
-except Exception as e:
-    st.error(f"Error loading max length: {e}")
 
 # Helper function to convert index to word
 def idx_to_word(integer, tokenizer):
@@ -70,21 +61,24 @@ def main():
     uploaded_image = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
     
     if uploaded_image is not None:
-        # Load and preprocess the uploaded image
-        image = load_img(uploaded_image, target_size=(224, 224))
-        image = img_to_array(image)
-        image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
-        image = preprocess_input(image)
-        
-        # Feature extraction using VGG16
-        feature = vgg_model.predict(image, verbose=0)
-        
-        # Predict caption using the loaded model
-        caption = predict_caption(model, feature, tokenizer, max_length)
-        
-        # Display the image and predicted caption
-        st.image(uploaded_image, caption='Uploaded Image.', use_column_width=True)
-        st.write("Generated Caption: ", caption)
+        try:
+            # Load and preprocess the uploaded image
+            image = load_img(uploaded_image, target_size=(224, 224))
+            image = img_to_array(image)
+            image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
+            image = preprocess_input(image)
+
+            # Feature extraction using VGG16
+            feature = vgg_model.predict(image, verbose=0)
+
+            # Predict caption using the loaded model
+            caption = predict_caption(model, feature, tokenizer, max_length)
+
+            # Display the image and predicted caption
+            st.image(uploaded_image, caption='Uploaded Image.', use_column_width=True)
+            st.write("Generated Caption: ", caption)
+        except Exception as e:
+            st.error(f"Error processing the image: {e}")
 
 if __name__ == "__main__":
     main()
