@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import pickle
+import pickle as p
 import numpy as np
 import re
 from PIL import Image
@@ -33,11 +33,11 @@ def load_resources():
     
     # Load files
     with open(file_paths['features'], 'rb') as f:
-        features = pickle.load(f)
+        features = p.load(f)
     with open(file_paths['max_length'], 'rb') as f:
-        max_length = pickle.load(f)
+        max_length = p.load(f)
     with open(file_paths['tokenizer'], 'rb') as f:
-        tokenizer = pickle.load(f)
+        tokenizer = p.load(f)
     model = tf.keras.models.load_model(file_paths['model'])
     return features, max_length, tokenizer, model
 
