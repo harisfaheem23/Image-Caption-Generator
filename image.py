@@ -19,7 +19,7 @@ def load_vgg16():
 # Load model, tokenizer, and other resources
 def load_resources():
     file_paths = {
-       # 'features': os.path.join(base_path, 'features.pkl'),
+        'features': os.path.join(base_path, 'features.pkl'),
         'max_length': os.path.join(base_path, 'max_length.pkl'),
         'tokenizer': os.path.join(base_path, 'tokenizer.pickle'),
         'model': os.path.join(base_path, 'best_model.keras')
@@ -32,8 +32,8 @@ def load_resources():
             raise FileNotFoundError(f"{key} file not found at {path}")
     
     # Load files
-  #  with open(file_paths['features'], 'rb') as f:
-   #     features = p.load(f)
+    with open(file_paths['features'], 'rb') as f:
+        features = p.load(f)
     with open(file_paths['max_length'], 'rb') as f:
         max_length = p.load(f)
     with open(file_paths['tokenizer'], 'rb') as f:
