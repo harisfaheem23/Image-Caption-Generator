@@ -1,68 +1,41 @@
 import streamlit as st
-import os
-import pickle as p
-import numpy as np
-import re
-from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
-from tensorflow.keras.models import Model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+import numpy as np
+import pickle
+import os
 
-base_path = "."
+# Define the working directory for loading files
+WORKING_DIR = '.'  # Current directory
 
-# Load pre-trained VGG16 model for feature extraction
-def load_vgg16():
-    vgg_model = VGG16()
-    return Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
+# Load the trained model
+model_path = os.path.join(WORKING_DIR, 'best_model.keras')
+tokenizer_path = os.path.join(WORKING_DIR, 'tokenizer.pickle')
+max_length_path = os.path.join(WORKING_DIR, 'max_length.pkl')
 
-# Load model, tokenizer, and other resources
-def load_resources():
-    file_paths = {
-        'features': os.path.join(base_path, 'features.pkl'),
-        'max_length': os.path.join(base_path, 'max_length.pkl'),
-        'tokenizer': os.path.join(base_path, 'tokenizer.pickle'),
-        'model': os.path.join(base_path, 'best_model.keras')
-    }
-    
-    # Check if all files exist
-    for key, path in file_paths.items():
-        if not os.path.exists(path):
-            st.error(f"{key} file not found at {path}")
-            raise FileNotFoundError(f"{key} file not found at {path}")
-    
-    # Load files
-    with open(file_paths['features'], 'rb') as f:
-        features = p.load(f)
-    with open(file_paths['max_length'], 'rb') as f:
-        max_length = p.load(f)
-    with open(file_paths['tokenizer'], 'rb') as f:
-        tokenizer = p.load(f)
-    model = tf.keras.models.load_model(file_paths['model'])
-    return features, max_length, tokenizer, model
+# Load model, tokenizer, and max_length with error handling
+try:
+    model = tf.keras.models.load_model(model_path)
+except Exception as e:
+    st.error(f"Error loading model: {e}")
 
-# Clean the captions
-def clean_caption(caption):
-    caption = caption.lower()
-    caption = re.sub(r'[^\w\s]', '', caption)
-    caption = re.sub(r'\s+', ' ', caption)
-    return 'startseq ' + ' '.join([word for word in caption.split() if len(word) > 1]) + ' endseq'
+# Load VGG16 model for feature extraction
+vgg_model = VGG16()
+vgg_model = tf.keras.Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
 
-# Predict caption for a given image
-def predict_caption(model, image, tokenizer, max_length):
-    in_text = 'startseq'
-    for _ in range(max_length):
-        sequence = tokenizer.texts_to_sequences([in_text])[0]
-        sequence = pad_sequences([sequence], max_length)
-        yhat = model.predict([image, sequence], verbose=0)
-        yhat = np.argmax(yhat)
-        word = idx_to_word(yhat, tokenizer)
-        if word is None:
-            break
-        in_text += " " + word
-        if word == 'endseq':
-            break
-    return in_text.replace('startseq', '').replace('endseq', '').strip()
+# Load tokenizer and max_length
+try:
+    with open(tokenizer_path, 'rb') as f:
+        tokenizer = pickle.load(f)
+except Exception as e:
+    st.error(f"Error loading tokenizer: {e}")
+
+try:
+    with open(max_length_path, 'rb') as f:
+        max_length = pickle.load(f)
+except Exception as e:
+    st.error(f"Error loading max length: {e}")
 
 # Helper function to convert index to word
 def idx_to_word(integer, tokenizer):
@@ -71,31 +44,47 @@ def idx_to_word(integer, tokenizer):
             return word
     return None
 
-# Streamlit UI
-st.title('Image Captioning')
-st.write('Upload an image to get a caption.')
+# Function to predict image caption
+def predict_caption(model, image, tokenizer, max_length):
+    in_text = 'startseq'
+    for i in range(max_length):
+        sequence = tokenizer.texts_to_sequences([in_text])[0]
+        sequence = tf.keras.preprocessing.sequence.pad_sequences([sequence], maxlen=max_length)
+        yhat = model.predict([image, sequence], verbose=0)
+        yhat = np.argmax(yhat)
+        word = idx_to_word(yhat, tokenizer)
+        if word is None:
+            break
+        in_text += " " + word
+        if word == 'endseq':
+            break
+    # Remove 'startseq' and 'endseq' from the generated caption
+    final_caption = in_text.split()[1:-1]
+    return ' '.join(final_caption)
 
-uploaded_file = st.file_uploader("Choose an image...", type="jpg")
-if uploaded_file is not None:
-    # Load and preprocess image
-    image = Image.open(uploaded_file)
-    image = image.resize((224, 224))
-    image = np.array(image)
-    image = np.expand_dims(image, axis=0)
-    image = preprocess_input(image)
+# Main Streamlit app function
+def main():
+    st.title("Image Caption Generator")
     
-    # Load resources
-    try:
-        features, max_length, tokenizer, model = load_resources()
-    except FileNotFoundError as e:
-        st.error(f"Error loading resources: {e}")
-        st.stop()
+    # File uploader for image
+    uploaded_image = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
     
-    # Extract features and predict caption
-    vgg_model = load_vgg16()
-    feature = vgg_model.predict(image, verbose=0)
-    caption = predict_caption(model, feature, tokenizer, max_length)
-    
-    st.image(uploaded_file, caption='Uploaded Image.', use_column_width=True)
-    st.write(f'Predicted Caption: {caption}')
+    if uploaded_image is not None:
+        # Load and preprocess the uploaded image
+        image = load_img(uploaded_image, target_size=(224, 224))
+        image = img_to_array(image)
+        image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
+        image = preprocess_input(image)
+        
+        # Feature extraction using VGG16
+        feature = vgg_model.predict(image, verbose=0)
+        
+        # Predict caption using the loaded model
+        caption = predict_caption(model, feature, tokenizer, max_length)
+        
+        # Display the image and predicted caption
+        st.image(uploaded_image, caption='Uploaded Image.', use_column_width=True)
+        st.write("Generated Caption: ", caption)
 
+if _name_ == "_main_":
+    main()
