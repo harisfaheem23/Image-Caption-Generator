@@ -97,8 +97,5 @@ if uploaded_file is not None:
     caption = predict_caption(model, feature, tokenizer, max_length)
     
     st.image(uploaded_file, caption='Uploaded Image.', use_column_width=True)
-    st.write(f'Predicted Caption: {caption}')'''
-
-with open("features.pkl", "rb") as f:
-    features = pickle.load(f)
-print(features)
+    st.write(f'Predicted Caption: {caption}')
+)
