@@ -1,4 +1,4 @@
-'''import streamlit as st
+import streamlit as st
 import os
 import pickle as p
 import numpy as np
@@ -98,7 +98,6 @@ if uploaded_file is not None:
     
     st.image(uploaded_file, caption='Uploaded Image.', use_column_width=True)
     st.write(f'Predicted Caption: {caption}')'''
-import pickle
 
 with open("features.pkl", "rb") as f:
     features = pickle.load(f)
