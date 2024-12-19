@@ -86,5 +86,5 @@ def main():
         st.image(uploaded_image, caption='Uploaded Image.', use_column_width=True)
         st.write("Generated Caption: ", caption)
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
